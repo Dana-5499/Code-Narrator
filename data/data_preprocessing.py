@@ -1,4 +1,4 @@
-!pip install -U datasets
+!pip install -U "datasets<4.0" 
 from datasets import load_dataset
 
 # downloading each of the train, validation and test data set of code search net from hugging face
@@ -24,7 +24,8 @@ def preprocess(example):
     return {
         "instruction": "Explain what the following code does.",
         "code":        example["func_code_string"],
-        "docstring":   example["func_documentation_string"].strip()
+        "docstring":   example["func_documentation_string"].strip(),
+        "language":    example.get("language", "code")
     }
 
 # apply preprocess function on each train data set and removing rest of fields
@@ -83,7 +84,8 @@ for ds in (train_ds, val_ds, test_ds):
         lambda example: {
             "instruction": example["instruction"],
             "code":        example["code"],
-            "docstring":   extract_summary(example["docstring"])
+            "docstring":   extract_summary(example["docstring"]),
+            "language":    example.get("language", "code")
         },
         remove_columns=ds.column_names  # discard the old docstring` field
     )
