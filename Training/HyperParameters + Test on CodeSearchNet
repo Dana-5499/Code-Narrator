@@ -10,32 +10,35 @@ SEED = 42
 random.seed(SEED)
 torch.manual_seed(SEED)
 
-# Your compact Python dataset path (CodeSearchNet-compact by lang)
+# Load the compact CodeSearchNet (python-only) dataset saved to Drive.
+# We assert it exists to fail fast with a clear error if the path is wrong.
 py_dir = "/content/drive/MyDrive/codesearchnet_compact_by_lang/python"
 assert os.path.exists(py_dir), f"Missing dataset at: {py_dir}"
 ds_python = load_from_disk(py_dir)
 print("Splits:", list(ds_python.keys()))
 print({k: len(ds_python[k]) for k in ds_python.keys()})
 
-# Turn off WandB
+# Disable external tracking and nudge CUDA to fragment less.
 os.environ["WANDB_DISABLED"] = "true"
-# Help CUDA allocator (reduces fragmentation)
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # ===== Cell 2: Prepare training/eval texts =====
-# Keep concise docstrings only
+# We keep only examples with a non-trivial docstring (10+ chars and alphabetic start).
 def good_doc(ex):
     t = (ex.get("docstring") or "").strip()
     return len(t) >= 10 and t[0].isalpha()
 
+# Filter each split to “good” examples only.
 train_raw = ds_python["train"].filter(good_doc)
 val_raw   = ds_python["validation"].filter(good_doc)
 test_raw  = ds_python["test"].filter(good_doc)
 print("Prepared filter sizes:", len(train_raw), len(val_raw), len(test_raw))
 
+# System instruction (stable across all examples).
 SYS = ("You are a senior engineer. Summarize code for non-technical managers: "
        "plain English, 1–3 sentences, no jargon, no code, start with a verb.")
 
+# Convert raw example -> chat-style string with system/user/assistant turns.
 def to_chat(ex):
     code = ex["code"]
     target = (ex.get("docstring") or "").strip()
@@ -48,6 +51,7 @@ def to_chat(ex):
         "<|im_start|>assistant\n" + target + "<|im_end|>\n"
     }
 
+# Map each split into chat-format and drop original columns.
 train_sft = train_raw.map(to_chat, remove_columns=train_raw.column_names)
 val_sft   = val_raw.map(to_chat,   remove_columns=val_raw.column_names)
 test_sft  = test_raw.map(to_chat,  remove_columns=test_raw.column_names)
@@ -57,9 +61,12 @@ print({"train": len(train_sft), "val": len(val_sft), "test": len(test_sft)})
 # ===== Cell 3: Tokenize/Collate + CE/PPL eval =====
 from torch.utils.data import DataLoader
 
+# Everything after this tag is considered "assistant output" and gets the label,
+# while tokens before are masked (-100) so loss is computed only on the answer.
 response_template = "<|im_start|>assistant\n"
 MAX_LEN_DEFAULT = 1536
 
+# Tokenize prompt+answer, then mask the prompt tokens in labels to -100.
 def tokenize_and_mask_factory(tok, max_len=MAX_LEN_DEFAULT):
     def _f(ex):
         full_text = ex["text"]
@@ -80,6 +87,7 @@ def tokenize_and_mask_factory(tok, max_len=MAX_LEN_DEFAULT):
         return {"input_ids": input_ids, "attention_mask": attention_mask, "labels": labels}
     return _f
 
+# Pad variable-length batches for input/attention/labels.
 def pad_collate(tok):
     def _c(batch):
         ids = [torch.tensor(x["input_ids"], dtype=torch.long) for x in batch]
@@ -92,6 +100,7 @@ def pad_collate(tok):
         return {"input_ids": ids, "attention_mask": ams, "labels": lbs}
     return _c
 
+# Cross-Entropy on assistant-only tokens; returns average CE and PPL.
 ce_loss = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
 
 @torch.no_grad()
@@ -128,6 +137,7 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 HF_TOKEN = None  # paste if you need gated models; else keep None
 
+# Load tokenizer + 4-bit quantized model for memory efficiency in Colab.
 def load_model_and_tokenizer(model_name: str, hf_token=None):
     try:
         bnb = BitsAndBytesConfig(
@@ -149,6 +159,7 @@ def load_model_and_tokenizer(model_name: str, hf_token=None):
     except Exception as e:
         raise RuntimeError(f"Could not load {model_name}: {e}")
 
+# Wrap the base model with LoRA adapters (keeps base weights frozen).
 def lora_wrap(model, use_gc=False):
     model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=use_gc)
     if hasattr(model, "gradient_checkpointing_enable") and use_gc:
@@ -174,7 +185,7 @@ import matplotlib.pyplot as plt
 MODEL = "deepseek-ai/deepseek-coder-1.3b-instruct"
 tok, base_model = load_model_and_tokenizer(MODEL, hf_token=HF_TOKEN)
 
-# Tokenized eval datasets (reuse across runs)
+# Pre-tokenize val/test once and reuse across runs.
 tnm = tokenize_and_mask_factory(tok, max_len=1536)
 val_tok  = val_sft.map(tnm,  remove_columns=["text"])
 test_tok = test_sft.map(tnm, remove_columns=["text"])
@@ -182,19 +193,19 @@ coll_eval = pad_collate(tok)
 val_loader  = DataLoader(val_tok,  batch_size=2, shuffle=False, collate_fn=coll_eval)
 test_loader = DataLoader(test_tok, batch_size=2, shuffle=False, collate_fn=coll_eval)
 
-EPOCH_GRID = [1, 2, 3]     # <= sweep this
-LR_FIXED   = 2e-4          # fix LR for this sweep
-BATCH_SIZE = 2             # per-device batch
+EPOCH_GRID = [1, 2, 3]     # sweep this
+LR_FIXED   = 2e-4          # keep lr fixed in this sweep
+BATCH_SIZE = 2             # small per-device batch for Colab
 GRAD_ACC   = 4
 MAX_LEN    = 1536
-USE_GC     = False         # gradient checkpointing (enable if needed)
+USE_GC     = False         # set True if you run OOM
 
-results = []      # holds final CE/PPL per run
-curves  = {}      # training/eval loss curves per epoch count
+results = []      # aggregated final CE/PPL per epoch choice
+curves  = {}      # per-run training/eval loss curves
 
 for EPOCHS in EPOCH_GRID:
     print(f"\n=== Training {MODEL} for {EPOCHS} epoch(s) ===")
-    # fresh LoRA head each time
+    # Create a fresh LoRA head for each run (base_model kept in memory).
     model = lora_wrap(base_model, use_gc=USE_GC)
 
     collator = DataCollatorForCompletionOnlyLM(
@@ -230,7 +241,7 @@ for EPOCHS in EPOCH_GRID:
 
     trainer.train()
 
-    # Collect curves
+    # Extract curves from trainer's log history.
     logs = getattr(trainer.state, "log_history", [])
     curves[EPOCHS] = {
         "loss": [(int(r["step"]), float(r["loss"])) for r in logs if "loss" in r],
@@ -238,14 +249,14 @@ for EPOCHS in EPOCH_GRID:
         "lr": [(int(r["step"]), float(r["learning_rate"])) for r in logs if "learning_rate" in r],
     }
 
-    # Final CE/PPL on val/test
+    # Compute CE/PPL using our masking metric on val/test.
     val_ce,  val_ppl  = eval_ce_ppl(trainer.model, val_loader)
     test_ce, test_ppl = eval_ce_ppl(trainer.model, test_loader)
     results.append(dict(epochs=EPOCHS, val_ce=val_ce, val_ppl=val_ppl,
                         test_ce=test_ce, test_ppl=test_ppl))
     print(f"[Epochs={EPOCHS}]  Val CE={val_ce:.4f} PPL={val_ppl:.2f} | Test CE={test_ce:.4f} PPL={test_ppl:.2f}")
 
-    # Free PEFT head only; keep base model resident to save load time
+    # Drop trainer/model objects between runs to free VRAM.
     try:
         del trainer
         del model
@@ -253,12 +264,12 @@ for EPOCHS in EPOCH_GRID:
         pass
     free_cuda()
 
-# Summarize
+# Summarize sweep results in a table + plots.
 df = pd.DataFrame(results).sort_values("test_ce")
 display(Markdown("## 📊 **num_train_epochs sweep (DeepSeek 1.3B Instruct)**"))
 display(df.style.format({"val_ce": "{:.4f}", "val_ppl": "{:.2f}", "test_ce": "{:.4f}", "test_ppl": "{:.2f}"}))
 
-# Overlay plots for train loss & eval loss across epoch settings
+# Overlay train loss per epoch choice.
 plt.figure(figsize=(8,4))
 for ep in EPOCH_GRID:
     xs = [s for s,_ in curves[ep]["loss"]]
@@ -268,6 +279,7 @@ for ep in EPOCH_GRID:
 plt.title("Training loss vs steps (by num_train_epochs)")
 plt.xlabel("Step"); plt.ylabel("Loss"); plt.grid(True, alpha=.3); plt.legend(); plt.tight_layout(); plt.show()
 
+# Overlay eval loss per epoch choice.
 plt.figure(figsize=(8,4))
 for ep in EPOCH_GRID:
     xs = [s for s,_ in curves[ep]["eval_loss"]]
@@ -277,7 +289,7 @@ for ep in EPOCH_GRID:
 plt.title("Eval loss vs steps (by num_train_epochs)")
 plt.xlabel("Step"); plt.ylabel("Eval loss"); plt.grid(True, alpha=.3); plt.legend(); plt.tight_layout(); plt.show()
 
-# CE comparison bar (lower is better)
+# Bar chart: test CE per epoch count.
 plt.figure(figsize=(7.5,4))
 plt.bar([str(r["epochs"]) for r in results], [r["test_ce"] for r in results])
 plt.title("Test Cross-Entropy by num_train_epochs (lower is better)")
@@ -289,21 +301,21 @@ from IPython.display import display, Markdown
 from torch.utils.data import DataLoader
 from trl import SFTTrainer, SFTConfig, DataCollatorForCompletionOnlyLM
 
-# ---- Config you can tweak ----
+# Sweep learning rates while holding other knobs.
 MODEL_TARGET   = "deepseek-ai/deepseek-coder-1.3b-instruct"
-LR_GRID        = [5e-5, 1e-4, 2e-4, 3e-4]   # try widening/narrowing as needed
-NUM_EPOCHS     = 1                           # from the previous sweep’s best
-BATCH_SIZE     = 2                           # safe on Colab for 4-bit 1.3B
+LR_GRID        = [5e-5, 1e-4, 2e-4, 3e-4]
+NUM_EPOCHS     = 1
+BATCH_SIZE     = 2
 GRAD_ACC       = 4
 MAX_SEQ_LENGTH = 1536
-USE_GC         = True                        # gradient checkpointing for memory
+USE_GC         = True
 EVAL_STEPS     = 100
 LOGGING_STEPS  = 10
 
 os.environ["WANDB_DISABLED"] = "true"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# ---- Helpers for this cell ----
+# Utility to parse trainer logs into arrays for plotting.
 def _extract_logs(trainer):
     logs = getattr(trainer.state, "log_history", [])
     loss_s, loss_v, lr_s, lr_v, eval_s, eval_v = [], [], [], [], [], []
@@ -316,6 +328,7 @@ def _extract_logs(trainer):
         if "eval_loss" in row:      eval_s.append(step); eval_v.append(float(row["eval_loss"]))
     return loss_s, loss_v, lr_s, lr_v, eval_s, eval_v
 
+# Create val/test loaders once for consistent evaluation.
 def _prep_loaders(tok, max_len=MAX_SEQ_LENGTH, bs=2):
     tnm = tokenize_and_mask_factory(tok)
     val_tok  = val_sft.map(tnm,  remove_columns=["text"])
@@ -325,7 +338,7 @@ def _prep_loaders(tok, max_len=MAX_SEQ_LENGTH, bs=2):
     test_loader = DataLoader(test_tok, batch_size=bs, shuffle=False, collate_fn=coll)
     return val_loader, test_loader
 
-# ---- Train & evaluate for each LR ----
+# Run one training per LR and collect curves + final CE/PPL.
 runs = []
 for lr in LR_GRID:
     print(f"\n=== learning_rate = {lr:.1e} ===")
@@ -367,14 +380,12 @@ for lr in LR_GRID:
     trainer.train()
     print("Done.")
 
-    # Keep minimal artifacts in-memory for plotting and CE/PPL
     runs.append({"lr": lr, "trainer": trainer, "tok": tok})
 
-    # Free heavy refs (model will be inside trainer.model; keep trainer)
     try: free_cuda()
     except: pass
 
-# ---- Plots: eval loss curves per LR ----
+# Plot eval-loss vs steps for all LRs.
 plt.figure(figsize=(8, 4.5))
 for r in runs:
     loss_s, loss_v, _, _, eval_s, eval_v = _extract_logs(r["trainer"])
@@ -384,7 +395,7 @@ plt.title("Eval loss vs steps (by learning_rate)")
 plt.xlabel("Step"); plt.ylabel("Eval loss")
 plt.grid(True, alpha=.35); plt.legend(title="LR"); plt.tight_layout(); plt.show()
 
-# ---- Final CE/PPL on val/test for each LR ----
+# Evaluate final CE/PPL per LR on val & test.
 summary = []
 for r in runs:
     tok = r["tok"]
@@ -402,7 +413,7 @@ display(df.style.format({"learning_rate": "{:.1e}",
                          "val_ce": "{:.4f}", "val_ppl": "{:.2f}",
                          "test_ce": "{:.4f}", "test_ppl": "{:.2f}"}))
 
-# ---- Bar: test CE (lower is better) ----
+# Bar chart for test CE per LR (lower is better).
 plt.figure(figsize=(7.5, 3.8))
 plt.bar([f"{lr:.1e}" for lr in df["learning_rate"]], df["test_ce"])
 plt.title("Test Cross-Entropy by learning_rate (lower is better)")
@@ -415,23 +426,22 @@ from IPython.display import display, Markdown
 from torch.utils.data import DataLoader
 from trl import SFTTrainer, SFTConfig, DataCollatorForCompletionOnlyLM
 
-# ---- Fixed knobs (tweak if needed) ----
+# Sweep schedulers while holding LR/warmup constant; evaluate on validation only.
 MODEL_TARGET    = "deepseek-ai/deepseek-coder-1.3b-instruct"
-LR_FIXED        = float(BEST_LR) if 'BEST_LR' in globals() else 2e-4  # from your LR sweep
+LR_FIXED        = float(BEST_LR) if 'BEST_LR' in globals() else 2e-4
 SCHEDULERS      = ["linear", "cosine", "cosine_with_restarts", "polynomial", "constant_with_warmup", "constant"]
 NUM_EPOCHS      = 1
 BATCH_SIZE      = 2
 GRAD_ACC        = 4
 MAX_SEQ_LENGTH  = 1536
 USE_GC          = True
-WARMUP_RATIO    = 0.05                # keep fixed to isolate scheduler
+WARMUP_RATIO    = 0.05
 EVAL_STEPS      = 100
 LOGGING_STEPS   = 10
 
 os.environ["WANDB_DISABLED"] = "true"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# ---- Helpers ----
 def _extract_logs(trainer):
     logs = getattr(trainer.state, "log_history", [])
     loss_s, loss_v, eval_s, eval_v = [], [], [], []
@@ -448,7 +458,6 @@ def _prep_val_loader(tok, bs=2):
     coll = pad_collate(tok)
     return DataLoader(val_tok, batch_size=bs, shuffle=False, collate_fn=coll)
 
-# ---- Sweep schedulers (validation only) ----
 runs = []
 for sched in SCHEDULERS:
     print(f"\n=== lr_scheduler_type = {sched} | lr = {LR_FIXED:.1e} ===")
@@ -491,7 +500,7 @@ for sched in SCHEDULERS:
     try: free_cuda()
     except: pass
 
-# ---- Plot: validation eval-loss curves per scheduler ----
+# Plot eval-loss curves for each scheduler (validation only).
 plt.figure(figsize=(9, 4.6))
 for r in runs:
     _, _, es, ev = _extract_logs(r["trainer"])
@@ -500,7 +509,7 @@ plt.title("Validation eval loss vs steps (by lr_scheduler_type)")
 plt.xlabel("Step"); plt.ylabel("Eval loss")
 plt.grid(True, alpha=.35); plt.legend(title="Scheduler"); plt.tight_layout(); plt.show()
 
-# ---- Validation CE/PPL & pick best scheduler ----
+# Compute validation CE/PPL for each scheduler and pick the best one by CE.
 summary = []
 for r in runs:
     tok = r["tok"]
@@ -508,7 +517,7 @@ for r in runs:
     v_ce, v_ppl = eval_ce_ppl(r["trainer"].model, val_loader)
     summary.append({"lr_scheduler_type": r["sched"], "val_ce": v_ce, "val_ppl": v_ppl})
 
-df = pd.DataFrame(summary).sort_values("val_ce", ascending=True).reset_index(drop=True)
+df = pd.DataFrame(summary).sort_values("val_ce", ascending=True).reset_index(drop_number=True)
 BEST_SCHED = df.iloc[0]["lr_scheduler_type"]
 
 display(Markdown(f"## 📊 **lr_scheduler_type sweep (Validation-only)**  \nUsing fixed LR: **{LR_FIXED:.1e}**, warmup_ratio: **{WARMUP_RATIO}**"))
@@ -521,14 +530,14 @@ from IPython.display import display, Markdown
 from torch.utils.data import DataLoader
 from trl import SFTTrainer, SFTConfig, DataCollatorForCompletionOnlyLM
 
-# ---- Fixed knobs (locked to your previous best choices) ----
+# Keep LR/scheduler fixed; sweep per-device batch size.
 MODEL_TARGET    = "deepseek-ai/deepseek-coder-1.3b-instruct"
 LR_FIXED        = float(BEST_LR) if 'BEST_LR' in globals() else 2e-4
 SCHEDULER       = str(BEST_SCHED) if 'BEST_SCHED' in globals() else "constant_with_warmup"
 WARMUP_RATIO    = 0.05
 NUM_EPOCHS      = 1
-BATCH_GRID      = [1, 2, 4]                  # per-device train batch sizes to compare
-GRAD_ACC_FIXED  = 4                          # keep gradient accumulation constant
+BATCH_GRID      = [1, 2, 4]
+GRAD_ACC_FIXED  = 4
 MAX_SEQ_LENGTH  = 1536
 USE_GC          = True
 EVAL_STEPS      = 100
@@ -537,7 +546,6 @@ LOGGING_STEPS   = 10
 os.environ["WANDB_DISABLED"] = "true"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# ---- Helpers ----
 def free_cuda():
     try:
         torch.cuda.empty_cache()
@@ -561,6 +569,7 @@ def _prep_val_loader(tok, bs=2):
     coll = pad_collate(tok)
     return DataLoader(val_tok, batch_size=bs, shuffle=False, collate_fn=coll)
 
+# Metric function (same as earlier)
 ce_loss = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
 @torch.no_grad()
 def eval_ce_ppl(model, loader):
@@ -583,7 +592,6 @@ def eval_ce_ppl(model, loader):
     ppl = math.exp(avg_ce) if avg_ce < 20 else float("inf")
     return avg_ce, ppl
 
-# ---- Sweep batch sizes (validation only) ----
 runs = []
 for bsz in BATCH_GRID:
     print(f"\n=== per_device_train_batch_size = {bsz} | lr = {LR_FIXED:.1e} | sched = {SCHEDULER} ===")
@@ -630,7 +638,7 @@ for bsz in BATCH_GRID:
     finally:
         free_cuda()
 
-# ---- Plot: validation eval-loss curves per batch size (clean lines, no markers) ----
+# Plot eval-loss vs steps for successful runs.
 ok_runs = [r for r in runs if r["status"] == "ok" and r["trainer"] is not None]
 plt.figure(figsize=(11, 5.6))
 for r in ok_runs:
@@ -644,7 +652,7 @@ if ok_runs:
     plt.legend(title="Batch size", ncols=min(len(ok_runs), 4), loc="upper right", frameon=True)
 plt.tight_layout(); plt.show()
 
-# ---- Validation CE/PPL & pick best batch size ----
+# Compute validation CE/PPL for each successful batch size and show a bar chart.
 summary = []
 for r in ok_runs:
     tok = r["tok"]
@@ -654,7 +662,7 @@ for r in ok_runs:
 
 if summary:
     df = pd.DataFrame(summary).sort_values("val_ce", ascending=True).reset_index(drop=True)
-    BEST_BSZ = int(df.iloc[0]["batch_size"])  # expose globally for later cells
+    BEST_BSZ = int(df.iloc[0]["batch_size"])
 
     display(Markdown(
         f"## 📊 **Batch-size sweep (Validation-only)**  \n"
@@ -664,7 +672,6 @@ if summary:
     display(df.style.format({"val_ce": "{:.4f}", "val_ppl": "{:.2f}"}))
     print(f"\n>>> Selected BEST_BSZ (lowest validation CE): {BEST_BSZ}")
 
-    # Bar: validation CE (lower is better)
     plt.figure(figsize=(7.8, 4.0))
     plt.bar([str(int(x)) for x in df["batch_size"]], df["val_ce"])
     plt.title("Validation Cross-Entropy by per-device batch size (lower is better)")
@@ -679,25 +686,24 @@ from IPython.display import display, Markdown
 from torch.utils.data import DataLoader
 from trl import SFTTrainer, SFTConfig, DataCollatorForCompletionOnlyLM
 
-# ---- Fixed knobs (locked to your previous best choices) ----
+# Compare several optimizers under the same LR/scheduler/epoch settings.
 MODEL_TARGET    = "deepseek-ai/deepseek-coder-1.3b-instruct"
-LR_FIXED        = 2e-4                       # from your LR sweep
-SCHEDULER       = "constant_with_warmup"     # from your scheduler sweep
+LR_FIXED        = 2e-4
+SCHEDULER       = "constant_with_warmup"
 WARMUP_RATIO    = 0.05
 NUM_EPOCHS      = 1
-BATCH_SIZE      = 2                          # keep consistent with prior sweeps
+BATCH_SIZE      = 2
 GRAD_ACC        = 4
 MAX_SEQ_LENGTH  = 1536
 USE_GC          = True
 EVAL_STEPS      = 100
 LOGGING_STEPS   = 10
 
-# Compare 4 optimizers (adds SGD)
 OPTIMIZERS = [
-    ("paged_adamw_32bit", None),                 # memory-efficient AdamW (baseline)
-    ("adamw_torch",       None),                 # standard PyTorch AdamW
-    ("adafactor",         None),                 # memory-lean NLP favorite
-    ("sgd",               "momentum=0.9,nesterov=True"),  # SGD (to visualize underperformance)
+    ("paged_adamw_32bit", None),
+    ("adamw_torch",       None),
+    ("adafactor",         None),
+    ("sgd",               "momentum=0.9,nesterov=True"),  # intentionally included for contrast
 ]
 
 os.environ["WANDB_DISABLED"] = "true"
@@ -726,7 +732,6 @@ def _prep_val_loader(tok, bs=2):
     coll = pad_collate(tok)
     return DataLoader(val_tok, batch_size=bs, shuffle=False, collate_fn=coll)
 
-# CE/PPL metric (assistant-only labels)
 ce_loss = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
 @torch.no_grad()
 def eval_ce_ppl(model, loader):
@@ -749,7 +754,6 @@ def eval_ce_ppl(model, loader):
     ppl = math.exp(avg_ce) if avg_ce < 20 else float("inf")
     return avg_ce, ppl
 
-# ---- Sweep optimizers (validation only) ----
 runs = []
 for opt_name, opt_args in OPTIMIZERS:
     print(f"\n=== optimizer = {opt_name} | lr = {LR_FIXED:.1e} | sched = {SCHEDULER} ===")
@@ -779,7 +783,7 @@ for opt_name, opt_args in OPTIMIZERS:
         report_to="none",
         dataset_text_field="text",
         optim=opt_name,
-        optim_args=opt_args,   # e.g., SGD momentum
+        optim_args=opt_args,   # e.g., pass SGD momentum
     )
 
     trainer = SFTTrainer(
@@ -792,7 +796,7 @@ for opt_name, opt_args in OPTIMIZERS:
     runs.append({"opt": opt_name, "trainer": trainer, "tok": tok})
     free_cuda()
 
-# ---- Plot: validation eval-loss curves per optimizer (no markers) ----
+# Show eval-loss curves by optimizer.
 plt.figure(figsize=(11, 5.2), dpi=140)
 for r in runs:
     es, ev = _extract_eval(r["trainer"])
@@ -804,7 +808,7 @@ plt.xlabel("Step"); plt.ylabel("Eval loss")
 plt.grid(True, alpha=.3); plt.legend(title="Optimizer")
 plt.tight_layout(); plt.show()
 
-# ---- Validation CE/PPL & pick best optimizer ----
+# Compute validation CE/PPL for each optimizer and select best by CE.
 summary = []
 for r in runs:
     tok = r["tok"]
@@ -823,7 +827,7 @@ display(Markdown(
 display(df.style.format({"val_ce": "{:.4f}", "val_ppl": "{:.2f}"}))
 print(f"\n>>> Selected BEST_OPT (lowest validation CE): {BEST_OPT}")
 
-# ---- Bar: validation CE (sorted, lower is better) ----
+# Bar chart of validation CE by optimizer (sorted).
 plt.figure(figsize=(8.8, 4.2), dpi=140)
 order = df.sort_values("val_ce")["optimizer"]
 vals  = df.set_index("optimizer").loc[order]["val_ce"].values
@@ -844,7 +848,7 @@ from IPython.display import display, Markdown
 from torch.utils.data import DataLoader
 from trl import SFTTrainer, SFTConfig, DataCollatorForCompletionOnlyLM
 
-# ---- Fixed knobs: your chosen hyperparams ----
+# Fixed knobs chosen from earlier sweeps (or your preferred picks).
 MODEL_TARGET    = "deepseek-ai/deepseek-coder-1.3b-instruct"
 LR_FIXED        = 2e-4
 SCHEDULER       = "constant_with_warmup"
@@ -878,14 +882,14 @@ def _extract_eval(trainer):
             es.append(step); ev.append(float(row["eval_loss"]))
     return es, ev
 
+# Build a test loader using our assistant-only masking.
 def _prep_test_loader(tok, bs=2):
-    # assumes tokenize_and_mask_factory(), pad_collate(), and test_sft exist from your earlier cells
     tnm = tokenize_and_mask_factory(tok)
     test_tok = test_sft.map(tnm, remove_columns=["text"])
     coll = pad_collate(tok)
     return DataLoader(test_tok, batch_size=bs, shuffle=False, collate_fn=coll)
 
-# CE/PPL metric (assistant-only labels)
+# CE/PPL on masked labels (assistant-only).
 ce_loss = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
 @torch.no_grad()
 def eval_ce_ppl(model, loader):
@@ -908,7 +912,7 @@ def eval_ce_ppl(model, loader):
     ppl = math.exp(avg_ce) if avg_ce < 20 else float("inf")
     return avg_ce, ppl
 
-# ---- Single run: train on TRAIN, eval during training on TEST, and final CE/PPL on TEST ----
+# Train on TRAIN; evaluate during training on TEST; report final TEST CE/PPL.
 print(f"\n=== Train on CodeSearchNet TRAIN | Eval on TEST | opt={OPTIMIZER_NAME} | lr={LR_FIXED:.1e} | sched={SCHEDULER} | bsz={BATCH_SIZE} ===")
 tok, base_model = load_model_and_tokenizer(MODEL_TARGET)
 model = lora_wrap(base_model, use_gc=USE_GC)
@@ -931,23 +935,23 @@ cfg = SFTConfig(
     fp16=True,
     logging_steps=LOGGING_STEPS,
     evaluation_strategy="steps",
-    eval_steps=EVAL_STEPS,               # will evaluate on TEST every EVAL_STEPS
+    eval_steps=EVAL_STEPS,               # evaluate on TEST every EVAL_STEPS
     save_steps=10_000,                   # effectively off
     report_to="none",
     dataset_text_field="text",
     optim=OPTIMIZER_NAME,
 )
 
-# IMPORTANT CHANGE: train on train_sft, eval on test_sft
+# IMPORTANT: we intentionally evaluate on TEST here to produce a test-loss curve.
 trainer = SFTTrainer(
     model=model, tokenizer=tok,
-    train_dataset=train_sft, eval_dataset=test_sft,   # <-- changed here
+    train_dataset=train_sft, eval_dataset=test_sft,   # eval on TEST
     args=cfg, data_collator=collator,
 )
 
 trainer.train()
 
-# ---- Plot: eval loss curve on TEST (no markers) ----
+# Plot eval-loss on TEST across training steps.
 plt.figure(figsize=(11, 5.2), dpi=140)
 es, ev = _extract_eval(trainer)
 if es:
@@ -957,7 +961,7 @@ plt.xlabel("Step"); plt.ylabel("Eval loss")
 plt.grid(True, alpha=.3); plt.legend(title="Optimizer")
 plt.tight_layout(); plt.show()
 
-# ---- Final CE/PPL on TEST ----
+# Final masked CE/PPL on TEST at the end of training.
 test_loader = _prep_test_loader(tok, bs=2)
 t_ce, t_ppl = eval_ce_ppl(trainer.model, test_loader)
 display(Markdown(
@@ -965,5 +969,5 @@ display(Markdown(
     f"- Optimizer: *{OPTIMIZER_NAME}*  \n"
     f"- LR: *{LR_FIXED:.1e}, Scheduler: *{SCHEDULER}*, Epochs: *{NUM_EPOCHS}**, "
     f"per-device batch: *{BATCH_SIZE}, grad_acc: *{GRAD_ACC}**  \n"
-    f"- *Test CE:* ⁠ {t_ce:.4f} ⁠  ·  *Test PPL:* ⁠ {t_ppl:.2f} ⁠"
+    f"- *Test CE:* ⁠ {t_ce:.4f} ⁠  ·  *Test PPL:* ⁠ {t_ppl:.2f} ⁠"
 ))
