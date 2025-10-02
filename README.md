@@ -28,7 +28,7 @@ Fine-Tuning Open-Source LLMs for Non-Technical Monitoring of Software Developmen
 
 ---
 
-## 🌍 Overview  
+## Overview  
 Software development consumes a large portion of company budgets, often exceeding 50% of total costs. Yet, non-technical managers frequently struggle to monitor real progress, as they must rely heavily on developer reports. This lack of visibility can lead to misallocation of resources, over-hiring, and missed risks.
 
 Code Narrator bridges this gap by fine-tuning open-source large language models (LLMs) to generate clear, natural-language explanations of software activity. The model can describe both code snippets and commit changes in plain English, enabling managers and stakeholders to track project progress without requiring deep technical expertise.
@@ -72,8 +72,10 @@ Our method involved:
 - **Baseline comparison** across multiple models and languages  
 - **Hyperparameter sweeps** (epochs, batch size, optimizers, schedulers)  
 - **Transfer of tuned parameters** from CodeSearchNet → CommitPackFT  
-- **Cocktail multi-task training** with a **50/50 mix** of both datasets  
+- **Cocktail multi-task training** with a **50/50 mix** of both datasets
 
+ <img width="561" height="542" alt="image" src="https://github.com/user-attachments/assets/afdbf650-c1ca-44d0-b1cd-93ebc7d9962b" />
+ 
 ---
 
 ## 🏗️ Model & Techniques  
