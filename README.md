@@ -1,7 +1,7 @@
 # 📖 Code Narrator  
 
 Fine-Tuning Open-Source LLMs for Non-Technical Monitoring of Software Development Progress  
-![Presentation1](https://github.com/user-attachments/assets/41fa9b5b-4883-45c3-8ddd-ec2520ebddbe)
+![Presentation1](https://github.com/user-attachments/assets/5ed80d99-6ce8-4ac5-9743-1a6dbcaa52a0)
 
 ---
 
