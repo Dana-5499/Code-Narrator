@@ -1,6 +1,6 @@
-# <img width="366" height="366" alt="image" src="https://github.com/user-attachments/assets/f3f97f3b-0f7d-4af4-aae0-8384ba0e3647" /> Code Narrator  
+# Code Narrator: Bridging non-technical managers and code with fine-tuned LLMs
 
-Fine-Tuning Open-Source LLMs for Non-Technical Monitoring of Software Development Progress  
+This project aims to develop an AI-powered assistant for monitoring software development progress by fine-tuning open-source large language models. Instead of generating more code, the model is trained to summarize existing code snippets and explain commit differences in clear, plain language. Using multi-task fine-tuning on CodeSearchNet and CommitPackFT datasets, combined with LoRA adapters and 4-bit quantization, the system provides non-technical managers and stakeholders with concise, human-readable insights into developer activity and project progress.
 ![Presentation1](https://github.com/user-attachments/assets/a6a9b447-8958-4e4b-a2e7-c3ad1bda36a0)
 
 ---
