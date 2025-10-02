@@ -43,10 +43,10 @@ This allows **non-technical managers and stakeholders** to:
 
 ---
 
-## ▶️ How To Run  
+## How To Run  
 
 
-## 📊 Datasets  
+## Datasets  
 
 ### 3.1 CodeSearchNet  
 - Covers **6 languages**: Python, Java, JavaScript, PHP, Ruby, Go  
@@ -65,7 +65,7 @@ This allows **non-technical managers and stakeholders** to:
 
 ---
 
-## 🧩 Training Approach  
+## Training Approach  
 
 Our method involved:  
 
@@ -78,7 +78,7 @@ Our method involved:
  
 ---
 
-## 🏗️ Model & Techniques  
+## Model & Techniques  
 
 ### 5.1 Base Model (DeepSeek-Coder)  
 We selected **DeepSeek-Coder 1.3B Instruct**, a Transformer-based LLM specialized for code.  
@@ -94,7 +94,7 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
 
 ---
 
-## 📈 Experiments and Results  
+## Experiments and Results  
 
 ### 6.1 Baseline Comparisons  
 *Figure 1 – Baseline validation cross-entropy across datasets* 
@@ -141,7 +141,7 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
 
 ---
 
-## ✅ Conclusions  
+## Conclusions  
 
 - Multi-task fine-tuning on both **code summarization** and **commit-diff explanation** proved effective  
 - **Hyperparameter tuning** on CodeSearchNet transferred successfully to CommitPackFT  
@@ -150,7 +150,7 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
 
 ---
 
-## 🚀 Future Work  
+## Future Work  
 
 - Test different **cocktail ratios** (e.g., 40/60, 70/30)  
 - Extend to **more programming languages** beyond Python  
@@ -160,7 +160,7 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
 
 ---
 
-## 📚 References  
+## References  
 
 - Husain H., Wu H., Gazit T., Allamanis M. & Brockschmidt M. (2019). *CodeSearchNet Challenge: Evaluating the State of Semantic Code Search*. arXiv:1909.09436
 - Muennighoff N., et al. (2023). *OctoPack: Instruction Tuning Code Large Language Models*. arXiv:2308.07124v2.
