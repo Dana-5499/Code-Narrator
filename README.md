@@ -1,11 +1,11 @@
-# 📖 Code Narrator  
+# <img width="366" height="366" alt="image" src="https://github.com/user-attachments/assets/f3f97f3b-0f7d-4af4-aae0-8384ba0e3647" /> Code Narrator  
 
 Fine-Tuning Open-Source LLMs for Non-Technical Monitoring of Software Development Progress  
-![Presentation1](https://github.com/user-attachments/assets/5ed80d99-6ce8-4ac5-9743-1a6dbcaa52a0)
+![Presentation1](https://github.com/user-attachments/assets/a6a9b447-8958-4e4b-a2e7-c3ad1bda36a0)
 
 ---
 
-## 📑 Table of Contents  
+## Table of Contents  
 
 1. [Overview](#overview)  
 2. [How To Run](#how-to-run)  
