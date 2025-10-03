@@ -59,8 +59,6 @@ This allows non-technical managers and stakeholders to:
 - **Figures**
   - Contains all generated plots and tables used for reporting and README visualizations (validation loss, baseline comparisons, cocktail results, etc.).
 
----
-
 ### Steps to Run
 
 1. **Preprocess datasets**
