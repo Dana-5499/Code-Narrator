@@ -181,36 +181,27 @@ The graph below shows the training loss over steps when applying the tuned setup
 In the final stage, we trained the model on a cocktail dataset composed of a 50/50 mix from both CodeSearchNet and CommitPackFT, using the tuned hyperparameters.  
 This approach led to a clear reduction in test loss on the combined dataset as well as consistent improvements when evaluating each dataset individually, showing the benefits of multi-task fine-tuning.
 
-<!-- Narrow metrics table -->
-<td align="center" width="30%" valign="top">
-  <table>
-    <thead>
-      <tr>
-        <th align="left">Dataset</th>
-        <th align="right">Baseline CE</th>
-        <th align="right">Cocktail CE</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td align="left"><strong>CodeSearchNet</strong></td>
-        <td align="right">0.7850</td>
-        <td align="right"><strong>0.0025</strong></td>
-      </tr>
-      <tr>
-        <td align="left"><strong>CommitPackFT</strong></td>
-        <td align="right">2.7596</td>
-        <td align="right">1.4980</td>
-      </tr>
-      <tr>
-        <td align="left"><strong>Cocktail (50/50)</strong></td>
-        <td align="right">1.7609</td>
-        <td align="right">0.7419</td>
-      </tr>
-    </tbody>
-  </table>
-  <p><em>Table 1 – Cocktail training outperformed baseline across all datasets.</em></p>
-</td>
+<table>
+  <tr>
+    <!-- Image cell -->
+    <td align="center" width="65%" valign="top">
+      <img src="https://github.com/user-attachments/assets/ed94c049-bdba-445a-833b-bcc54655f29e" alt="Figure 10" width="850"/>
+      <p><em>Figure 10 – Cocktail fine-tuning improved CE across the combined dataset</em></p>
+    </td>
+
+    <!-- Table cell -->
+    <td align="center" width="35%" valign="top">
+      
+| Dataset         | Baseline (no fine-tuning) CE test loss | Model after Cocktail training CE test loss |
+|-----------------|-----------------------------------------|--------------------------------------------|
+| **CodeSearchNet** | 0.7850 | 0.0025 |
+| **CommitPackFT**  | 2.7596 | 1.4980 |
+| **Cocktail (50/50)** | 1.7609 | 0.7419 |
+
+<p><em>Table 1 – Cocktail training outperformed baseline across all datasets.</em></p>
+    </td>
+  </tr>
+</table>
 
 ---
 
