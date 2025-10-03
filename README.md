@@ -32,12 +32,12 @@ This project aims to develop an AI-powered assistant for monitoring software dev
 ## Overview  
 Software development consumes a large portion of company budgets, often exceeding 50% of total costs. Yet, non-technical managers frequently struggle to monitor real progress, as they must rely heavily on developer reports. This lack of visibility can lead to misallocation of resources, over-hiring, and missed risks.
 
-Code Narrator bridges this gap by fine-tuning open-source large language models (LLMs) to generate clear, natural-language explanations of software activity. The model can describe both code snippets and commit changes in plain English, enabling managers and stakeholders to track project progress without requiring deep technical expertise.
+Code Narrator bridges this gap by fine-tuning open-source large language models to generate clear, natural-language explanations of software activity. The model can describe both code snippets and commit changes in plain English, enabling managers and stakeholders to track project progress without requiring deep technical expertise.
 
-Current LLM projects mostly aim to help **developers write code faster**. Our approach is different:  
-we fine-tune open-source models to **explain software development progress in plain language**.  
+Current LLM projects mostly aim to help developers write code faster. Our approach is different:  
+we fine-tune open-source models to explain software development progress in plain language.  
 
-This allows **non-technical managers and stakeholders** to:  
+This allows non-technical managers and stakeholders to:  
 - Understand current project functionality and progress
 - Track recent changes and commits
 - Improve communication with development teams
@@ -50,19 +50,19 @@ This allows **non-technical managers and stakeholders** to:
 ## Datasets  
 
 ### 3.1 CodeSearchNet  
-- Covers **6 languages**: Python, Java, JavaScript, PHP, Ruby, Go  
-- ~2M examples → compacted to **2,100 train / 600 test / 300 val per language**  
+- Covers 6 languages: Python, Java, JavaScript, PHP, Ruby, Go  
+- ~2M examples → compacted to 2,100 train / 600 test / 300 val per language  
 - **Preprocessing**:  
   - Removed auto-generated docstrings (e.g., *Doxygen style* like `:param x:`)  
   - Filtered docstrings (≥30 chars, capitalized, valid punctuation, no generic "See/Refer")  
   - Deduplicated samples, enforced length ranges  
 
 ### 3.2 CommitPackFT  
-- Derived from **CommitPack (350+ languages)**  
+- Derived from CommitPack (350+ languages)  
 - Filtered to the same 6 languages for consistency  
 - Fields kept: `old_code`, `new_code`, `language`, and combined `subject+message`  
-- Stratified **70–10–20 splits** per language  
-- Balanced compact subsets - **2,100 train / 600 test / 300 val per language** 
+- Stratified 70–10–20 splits per language  
+- Balanced compact subsets - 2,100 train / 600 test / 300 val per language
 
 ---
 
@@ -73,7 +73,7 @@ Our method involved:
 - **Baseline comparison** across multiple models and languages  
 - **Hyperparameter sweeps** (epochs, batch size, optimizers, schedulers)  
 - **Transfer of tuned parameters** from CodeSearchNet → CommitPackFT  
-- **Cocktail multi-task training** with a **50/50 mix** of both datasets
+- **Cocktail multi-task training** with a 50/50 mix of both datasets
 
  <img width="561" height="542" alt="image" src="https://github.com/user-attachments/assets/afdbf650-c1ca-44d0-b1cd-93ebc7d9962b" />
  
@@ -121,6 +121,43 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
 - Tested **Learning rates** (1e^-4 -> 5e^-4)
   <img width="1331" height="692" alt="image" src="https://github.com/user-attachments/assets/2db58604-1a7a-4c0a-891d-c933708a18f6" />
   *Figure 6 – Validation loss across learning rates*
+
+<!-- Row 1: Baseline + Optimizers -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d6228f76-6d26-4200-82a5-13c4d800d005" width="420" />
+  <img src="https://github.com/user-attachments/assets/47dc6906-6691-425b-9b89-ee50d951aada" width="420" />
+</p>
+<p align="center">
+  <em>Figure 1 – Baseline validation cross-entropy across datasets</em>&nbsp;&nbsp;&nbsp;&nbsp;
+  <em>Figure 2 – Validation loss comparison across optimizers</em>
+</p>
+
+<!-- Row 2: Schedulers + Epochs -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/20ecdc9c-bb29-4d05-aeea-998421fa54b3" width="420" />
+  <img src="https://github.com/user-attachments/assets/beb830b0-0435-4248-919b-3e6e8d22e22b" width="420" />
+</p>
+<p align="center">
+  <em>Figure 3 – Validation loss across different learning-rate schedulers</em>&nbsp;&nbsp;&nbsp;&nbsp;
+  <em>Figure 4 – Validation loss across training epochs</em>
+</p>
+
+<!-- Row 3: Batch size (centered alone) -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6703e0e4-388e-4197-8add-8ecf4797e100" width="520" />
+</p>
+<p align="center">
+  <em>Figure 5 – Validation loss across batch sizes</em>
+</p>
+
+<!-- Row 4: Learning rates (centered alone) – remove if you only want five figures -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2db58604-1a7a-4c0a-891d-c933708a18f6" width="520" />
+</p>
+<p align="center">
+  <em>Figure 6 – Validation loss across learning rates</em>
+</p>
+
 
 - **Best hyperparameters chosen:**  
   - Optimizer: **Adagrad**  
