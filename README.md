@@ -120,30 +120,36 @@ We tested:
 The following figures illustrate the validation loss trends for each hyperparameter category.
 
 <!-- Row 1: Optimizers + Schedulers -->
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/47dc6906-6691-425b-9b89-ee50d951aada" width="420" />
-  <img src="https://github.com/user-attachments/assets/20ecdc9c-bb29-4d05-aeea-998421fa54b3" width="420" />
-</p>
-<p align="center">
-  <em>Figure 3 – Validation loss comparison across optimizers</em>&nbsp;&nbsp;&nbsp;&nbsp;
-  <em>Figure 4 – Validation loss across different learning-rate schedulers</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/47dc6906-6691-425b-9b89-ee50d951aada" width="400" /><br/>
+      <em>Figure 3 – Validation loss comparison across optimizers</em>
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/20ecdc9c-bb29-4d05-aeea-998421fa54b3" width="400" /><br/>
+      <em>Figure 4 – Validation loss across different learning-rate schedulers</em>
+    </td>
+  </tr>
+</table>
 
 <!-- Row 2: Epochs + Batch size -->
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/beb830b0-0435-4248-919b-3e6e8d22e22b" width="420" />
-  <img src="https://github.com/user-attachments/assets/6703e0e4-388e-4197-8add-8ecf4797e100" width="420" />
-</p>
-<p align="center">
-  <em>Figure 5 – Validation loss across training epochs</em>&nbsp;&nbsp;&nbsp;&nbsp;
-  <em>Figure 6 – Validation loss across batch sizes</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/beb830b0-0435-4248-919b-3e6e8d22e22b" width="400" /><br/>
+      <em>Figure 5 – Validation loss across training epochs</em>
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/6703e0e4-388e-4197-8add-8ecf4797e100" width="400" /><br/>
+      <em>Figure 6 – Validation loss across batch sizes</em>
+    </td>
+  </tr>
+</table>
 
-<!-- Row 3: Learning rates (centered alone) -->
+<!-- Row 3: Learning rates (alone, centered) -->
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2db58604-1a7a-4c0a-891d-c933708a18f6" width="520" />
-</p>
-<p align="center">
+  <img src="https://github.com/user-attachments/assets/2db58604-1a7a-4c0a-891d-c933708a18f6" width="500" /><br/>
   <em>Figure 7 – Validation loss across learning rates</em>
 </p>
 
