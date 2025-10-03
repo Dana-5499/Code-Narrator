@@ -40,8 +40,44 @@ This allows non-technical managers and stakeholders to:
 
 ---
 
-## How To Run  
+## How To Run 
 
+### Files Explanation
+
+- **Data Sets**
+  - `CodeSearchNet.py` – Preprocessing pipeline for the CodeSearchNet dataset (filtering, cleaning docstrings, preparing splits).
+  - `CommitPackFT.py` – Preprocessing pipeline for the CommitPackFT dataset (commit message + subject cleaning, before/after code).
+  - `Cocktail.py` – Builds the 50/50 mixed dataset (CodeSearchNet + CommitPackFT) for multi-task training.
+
+- **Training**
+  - `ComparingModelsAndDeepSeek.py` – Baseline comparison across multiple models.
+  - `ComparingLanguagesAndOverFit.py` – Language-level baselines and overfitting check on small subset.
+  - `CheckHyperParametersOnCommit.py` – Hyperparameter evaluation on CommitPackFT dataset.
+  - `HyperParametersAndTestOnCodeSearchNet.py` – Hyperparameter tuning and validation on CodeSearchNet.
+  - `FinalModelTrainingAndTest.py` – Full training on the cocktail dataset (CodeSearchNet + CommitPackFT), evaluation, and test reporting.
+
+- **Figures**
+  - Contains all generated plots and tables used for reporting and README visualizations (validation loss, baseline comparisons, cocktail results, etc.).
+
+---
+
+### Steps to Run
+
+1. **Preprocess datasets**
+   - Run `Data Sets/CodeSearchNet.py` to prepare CodeSearchNet.
+   - Run `Data Sets/CommitPackFT.py` to prepare CommitPackFT.
+   - Run `Data Sets/Cocktail.py` to generate the mixed dataset.
+
+2. **Baseline evaluation**
+   - Run `Training/ComparingModelsAndDeepSeek.py` for initial model comparison.
+   - Run `Training/ComparingLanguagesAndOverFit.py` to check baselines by language and verify overfitting sanity checks.
+
+3. **Hyperparameter tuning**
+   - Run `Training/HyperParametersAndTestOnCodeSearchNet.py` for CodeSearchNet sweeps.
+   - Run `Training/CheckHyperParametersOnCommit.py` to validate hyperparameters on CommitPackFT.
+
+4. **Final training and evaluation**
+   - Run `Training/FinalModelTrainingAndTest.py` for cocktail fine-tuning and final evaluation across all datasets.
 
 ## Datasets  
 
