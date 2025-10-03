@@ -8,7 +8,9 @@ This project aims to develop an AI-powered assistant for monitoring software dev
 ## Table of Contents  
 
 1. [Overview](#overview)  
-2. [How To Run](#how-to-run)  
+2. [How To Run](#how-to-run)
+   - 2.1 Files Explanation
+   - 2.2 Steps to Run 
 3. [Datasets](#datasets)  
    - 3.1 CodeSearchNet  
    - 3.2 CommitPackFT  
@@ -42,7 +44,7 @@ This allows non-technical managers and stakeholders to:
 
 ## How To Run 
 
-### Files Explanation
+### 2.1 Files Explanation
 
 - **Data Sets**
   - `CodeSearchNet.py` – Preprocessing pipeline for the CodeSearchNet dataset (filtering, cleaning docstrings, preparing splits).
@@ -59,7 +61,7 @@ This allows non-technical managers and stakeholders to:
 - **Figures**
   - Contains all generated plots and tables used for reporting and README visualizations (validation loss, baseline comparisons, cocktail results, etc.).
 
-### Steps to Run
+### 2.2 Steps to Run
 
 1. **Preprocess datasets**
    - Run `Data Sets/CodeSearchNet.py` to prepare CodeSearchNet.
