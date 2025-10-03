@@ -14,14 +14,10 @@ This project aims to develop an AI-powered assistant for monitoring software dev
    - 3.2 CommitPackFT  
 4. [Training Approach](#training-approach)  
 5. [Model & Techniques](#model--techniques)  
-   - 5.1 Base Model (DeepSeek-Coder)  
-   - 5.2 Quantization (NF4)  
-   - 5.3 LoRA Fine-Tuning  
-   - 5.4 Loss Function  
 6. [Experiments and Results](#experiments-and-results)  
    - 6.1 Baseline Comparisons  
-   - 6.2 Overfitting Check  
-   - 6.3 Hyperparameter Tuning  
+   - 6.2 Hyperparameter Tuning
+   - 6.3 Transfer to CommitPackFT 
    - 6.4 Cocktail Training (50/50)  
 7. [Conclusions](#conclusions)  
 8. [Future Work](#future-work)  
@@ -87,31 +83,30 @@ Our method involved:
 
 ## Model & Techniques  
 
-### 5.1 Base Model (DeepSeek-Coder)  
-We selected **DeepSeek-Coder 1.3B Instruct**, a Transformer-based LLM specialized for code.  
-
-### 5.2 Quantization (NF4)  
-Applied **NF4 4-bit quantization** to reduce memory usage and support training on limited resources.  
-
-### 5.3 LoRA Fine-Tuning  
-Used **Low-Rank Adaptation (LoRA)** applied to attention and projection layers, reducing trainable parameters while maintaining performance.  
-
-### 5.4 Loss Function  
-Training used **Cross-Entropy (CE) loss**, the standard for next-token prediction in LLMs.  
+- **Base Model**: We selected DeepSeek-Coder 1.3B Instruct, a Transformer-based LLM specialized for code.
+- **Quantization**: Applied NF4 4-bit quantization to reduce memory usage and support training on limited resources.
+- **LoRA Fine-Tuning**: Used Low-Rank Adaptation (LoRA) applied to attention and projection layers, reducing trainable parameters while maintaining performance.
+- **Loss Function**: Training used Cross-Entropy (CE) loss, the standard for next-token prediction in LLMs.  
 
 ---
 
 ## Experiments and Results  
 
 ### 6.1 Baseline Comparisons 
+To establish a baseline, we evaluated **DeepSeek-Coder-1.3B** on three datasets:  
+- **CodeSearchNet** (docstring-based summaries)  
+- **CommitPackFT** (commit-diff explanations)  
+- A **50/50 cocktail mix** of both  
+
+Results show that CodeSearchNet achieved the lowest validation cross-entropy, reflecting its relative simplicity and consistency. CommitPackFT had substantially higher error, highlighting the difficulty of modeling natural commit messages. The cocktail dataset fell in between, demonstrating how combining both sources increases task diversity while providing more stable performance than CommitPackFT alone.
+
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d6228f76-6d26-4200-82a5-13c4d800d005" alt="Figure 1" width="700"/>
+  <img src="https://github.com/user-attachments/assets/d6228f76-6d26-4200-82a5-13c4d800d005" alt="Figure 1" width="500"/>
 </p>
 
 <p align="center">
   <em>Figure 2 – Baseline validation cross-entropy across datasets</em>
 </p>
-
 
 ### 6.2 Hyperparameter Tuning  
 Before finalizing our training setup, we systematically explored a range of hyperparameters to identify the most effective configuration.  
@@ -157,23 +152,50 @@ The following figures illustrate the validation loss trends for each hyperparame
   - Scheduler: Constant w/ Warmup 
   - Epochs: 1 (due to resource constraints)  
   - Batch Size: 4  
-  - Learning Rate: 2e-4  
+  - Learning Rate: 2e-4
+ 
+The selected combination of hyperparameters was then applied to the CodeSearchNet dataset, yielding the following training loss curve. This demonstrates how the tuned setup stabilized training and reduced loss efficiently.  
 
-### 6.4 Cocktail Training (50/50) 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6e94d42f-2eef-487a-a391-246127dbc9fe" alt="Figure 11" width="700"/>
+</p>
+
+<p align="center">
+  <em>Figure 8 – Training loss on CodeSearchNet with tuned hyperparameters</em>
+</p>
+
+### 6.3 Transfer to CommitPackFT 
+We then evaluated the tuned hyperparameters on the second dataset, CommitPackFT, to verify their effectiveness for the code change explanation task.  
+
+The graph below shows the training loss over steps when applying the tuned setup to CommitPackFT. The training curve demonstrates a clear decrease in loss, indicating that the model successfully adapted to the commit-diff explanation task. This confirms that the selected hyperparameters generalized well beyond the initial dataset, providing consistent convergence across both tasks.  
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/afd7cba5-e991-4770-993a-0a59d21f01bf" alt="Figure 12" width="700"/>
+</p>
+
+<p align="center">
+  <em>Figure 9 – Training loss on CommitPackFT with transferred hyperparameters</em>
+</p>
+
+### 6.4 Cocktail Training (50/50)
+In the final stage, we trained the model on a cocktail dataset composed of a 50/50 mix from both CodeSearchNet and CommitPackFT, using the tuned hyperparameters.  
+This approach led to a clear reduction in test loss on the combined dataset as well as consistent improvements when evaluating each dataset individually, showing the benefits of multi-task fine-tuning.
+
 <table>
   <tr>
     <td align="center" width="60%">
       <img src="https://github.com/user-attachments/assets/c60b7bfb-5f55-4b44-8f87-2b8debdfbae7" alt="Figure 7" width="100%"/>
-      <p><em>Figure 7 – Cocktail fine-tuning improved CE across the combined dataset</em></p>
+      <p><em>Figure 8 – Cocktail fine-tuning improved CE across the combined dataset</em></p>
     </td>
     <td align="center" width="40%">
       
-| Dataset       | Baseline CE | Cocktail CE | Baseline PPL | Cocktail PPL |
-|---------------|-------------|-------------|--------------|--------------|
-| CodeSearchNet | 2.08        | **1.79**    | 8.04         | **5.98**     |
-| CommitPackFT  | 2.25        | **1.95**    | 9.49         | **7.02**     |
+| Dataset       | Baseline (no fine-tuning) CE test loss | Model after Cocktail training CE test loss |
+|---------------|----------------------------|--------------------------------|
+| **CodeSearchNet** | 0.7850 | 0.0025 |
+| **CommitPackFT**  | 2.7596 | 1.4980 |
+| **Cocktail (50/50)** | 1.7609 | 0.7419 |
 
-<p><em>Table 1 – Cocktail training outperformed baseline across all metrics.</em></p>
+<p><em>Table 1 – Cocktail training outperformed baseline across all datasets.</em></p>
     </td>
   </tr>
 </table>
@@ -182,17 +204,17 @@ The following figures illustrate the validation loss trends for each hyperparame
 
 ## Conclusions  
 
-- Multi-task fine-tuning on both code summarization and commit-diff explanation proved effective  
-- Hyperparameter tuning on CodeSearchNet transferred successfully to CommitPackFT  
-- Cocktail training consistently outperformed baselines  
-- Generalization improved: performance gains extended across datasets  
+- Multi-task fine-tuning on both code summarization and commit-diff explanation proved effective
+- Hyperparameter tuning on CodeSearchNet transferred successfully to CommitPackFT
+- Cocktail training consistently outperformed baselines
+- Generalization improved: performance gains extended across datasets 
 
 ---
 
 ## Future Work  
 
-- Test different cocktail ratios (e.g., 40/60, 70/30)  
-- Extend to more programming languages beyond Python  
+- Test different cocktail ratios (e.g., 40/60, 70/30) 
+- Extend to more programming languages beyond Python 
 - Enable cross-language transfer learning* 
 - Handle multi-function snippets and repository-level tasks for large-scale projects  
 - Add predictive tasks (e.g., estimating delivery timelines from commit activity)  
