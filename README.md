@@ -189,7 +189,7 @@ This approach led to a clear reduction in test loss on the combined dataset as w
   <em>Figure 10 – Cocktail fine-tuning improved CE across the combined dataset</em>
 </p>
 
-<p align="center">
+<div align="center">
 
 | Dataset           | Baseline (no fine-tuning) CE test loss | Model after Cocktail training CE test loss |
 |-------------------|-----------------------------------------|--------------------------------------------|
@@ -197,11 +197,9 @@ This approach led to a clear reduction in test loss on the combined dataset as w
 | **CommitPackFT**  | 2.7596 | 1.4980 |
 | **Cocktail (50/50)** | 1.7609 | 0.7419 |
 
-</p>
+<em>Table 1 – Cocktail training outperformed baseline across all datasets.</em>
 
-<p align="center">
-  <em>Table 1 – Cocktail training outperformed baseline across all datasets.</em>
-</p>
+</div>
 
 ---
 
