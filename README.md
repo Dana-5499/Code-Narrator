@@ -75,7 +75,13 @@ Our method involved:
 - **Transfer of tuned parameters** from CodeSearchNet → CommitPackFT  
 - **Cocktail multi-task training** with a 50/50 mix of both datasets
 
- <img width="561" height="542" alt="image" src="https://github.com/user-attachments/assets/afdbf650-c1ca-44d0-b1cd-93ebc7d9962b" />
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/afdbf650-c1ca-44d0-b1cd-93ebc7d9962b" alt="Figure 1" width="400"/>
+</p>
+
+<p align="center">
+  <em>Figure 1 – Overview of our training pipeline</em>
+</p>
  
 ---
 
@@ -97,30 +103,26 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
 
 ## Experiments and Results  
 
-### 6.1 Baseline Comparisons  
-*Figure 1 – Baseline validation cross-entropy across datasets* 
-<img width="1757" height="1064" alt="image" src="https://github.com/user-attachments/assets/d6228f76-6d26-4200-82a5-13c4d800d005" />
+### 6.1 Baseline Comparisons 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d6228f76-6d26-4200-82a5-13c4d800d005" alt="Figure 1" width="700"/>
+</p>
+
+<p align="center">
+  <em>Figure 2 – Baseline validation cross-entropy across datasets</em>
+</p>
+
 
 ### 6.2 Hyperparameter Tuning  
-- Tested **optimizers** (AdamW, Adagrad, SGD)
-  <img width="1574" height="723" alt="image" src="https://github.com/user-attachments/assets/47dc6906-6691-425b-9b89-ee50d951aada" />
-  *Figure 2 – Validation loss comparison across optimizers*
-  
-- Tested **schedulers** (linear, cosine, constant w/ warmup, polynomial)
-  <img width="2428" height="938" alt="image" src="https://github.com/user-attachments/assets/20ecdc9c-bb29-4d05-aeea-998421fa54b3" />
-  *Figure 3 – Validation loss across different learning rate schedulers*
+Before finalizing our training setup, we systematically explored a range of hyperparameters to identify the most effective configuration.  
+We tested:  
+- **Optimizers**: AdamW, Adagrad, SGD  
+- **Learning rate schedulers**: linear, cosine, constant with warmup, polynomial  
+- **Number of epochs**: 1, 2, 3  
+- **Batch sizes**: 1, 2, 4  
+- **Learning rates**: from 1e-4 to 5e-4  
 
-- Tested **number of epochs** (1, 2, 3)
-  <img width="1495" height="719" alt="image" src="https://github.com/user-attachments/assets/beb830b0-0435-4248-919b-3e6e8d22e22b" />
-  *Figure 4 – Validation loss across training epochs*
-
-- Tested **batch size** (1, 2, 4)
-  <img width="1442" height="711" alt="image" src="https://github.com/user-attachments/assets/6703e0e4-388e-4197-8add-8ecf4797e100" />
-  *Figure 5 – Validation loss across batch sizes*
-
-- Tested **Learning rates** (1e^-4 -> 5e^-4)
-  <img width="1331" height="692" alt="image" src="https://github.com/user-attachments/assets/2db58604-1a7a-4c0a-891d-c933708a18f6" />
-  *Figure 6 – Validation loss across learning rates*
+The following figures illustrate the validation loss trends for each hyperparameter category.
 
 <!-- Row 1: Optimizers + Schedulers -->
 <p align="center">
@@ -128,8 +130,8 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
   <img src="https://github.com/user-attachments/assets/20ecdc9c-bb29-4d05-aeea-998421fa54b3" width="420" />
 </p>
 <p align="center">
-  <em>Figure 1 – Validation loss comparison across optimizers</em>&nbsp;&nbsp;&nbsp;&nbsp;
-  <em>Figure 2 – Validation loss across different learning-rate schedulers</em>
+  <em>Figure 3 – Validation loss comparison across optimizers</em>&nbsp;&nbsp;&nbsp;&nbsp;
+  <em>Figure 4 – Validation loss across different learning-rate schedulers</em>
 </p>
 
 <!-- Row 2: Epochs + Batch size -->
@@ -138,8 +140,8 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
   <img src="https://github.com/user-attachments/assets/6703e0e4-388e-4197-8add-8ecf4797e100" width="420" />
 </p>
 <p align="center">
-  <em>Figure 3 – Validation loss across training epochs</em>&nbsp;&nbsp;&nbsp;&nbsp;
-  <em>Figure 4 – Validation loss across batch sizes</em>
+  <em>Figure 5 – Validation loss across training epochs</em>&nbsp;&nbsp;&nbsp;&nbsp;
+  <em>Figure 6 – Validation loss across batch sizes</em>
 </p>
 
 <!-- Row 3: Learning rates (centered alone) -->
@@ -147,46 +149,53 @@ Training used **Cross-Entropy (CE) loss**, the standard for next-token predictio
   <img src="https://github.com/user-attachments/assets/2db58604-1a7a-4c0a-891d-c933708a18f6" width="520" />
 </p>
 <p align="center">
-  <em>Figure 5 – Validation loss across learning rates</em>
+  <em>Figure 7 – Validation loss across learning rates</em>
 </p>
 
-
 - **Best hyperparameters chosen:**  
-  - Optimizer: **Adagrad**  
-  - Scheduler: **Constant w/ Warmup**  
-  - Epochs: **1** (due to resource constraints)  
-  - Batch Size: **4**  
-  - Learning Rate: **2e-4**  
+  - Optimizer: Adagrad  
+  - Scheduler: Constant w/ Warmup 
+  - Epochs: 1 (due to resource constraints)  
+  - Batch Size: 4  
+  - Learning Rate: 2e-4  
 
-### 6.4 Cocktail Training (50/50) |
-<img width="2142" height="1046" alt="image" src="https://github.com/user-attachments/assets/c60b7bfb-5f55-4b44-8f87-2b8debdfbae7" />
-*Figure 7 – Cocktail fine-tuning improved CE across the combined dataset* 
-
+### 6.4 Cocktail Training (50/50) 
+<table>
+  <tr>
+    <td align="center" width="60%">
+      <img src="https://github.com/user-attachments/assets/c60b7bfb-5f55-4b44-8f87-2b8debdfbae7" alt="Figure 7" width="100%"/>
+      <p><em>Figure 7 – Cocktail fine-tuning improved CE across the combined dataset</em></p>
+    </td>
+    <td align="center" width="40%">
+      
 | Dataset       | Baseline CE | Cocktail CE | Baseline PPL | Cocktail PPL |
 |---------------|-------------|-------------|--------------|--------------|
 | CodeSearchNet | 2.08        | **1.79**    | 8.04         | **5.98**     |
 | CommitPackFT  | 2.25        | **1.95**    | 9.49         | **7.02**     |
 
-*Table 1 – Cocktail training outperformed baseline across all metrics.*  
+<p><em>Table 1 – Cocktail training outperformed baseline across all metrics.</em></p>
+    </td>
+  </tr>
+</table>
 
 ---
 
 ## Conclusions  
 
-- Multi-task fine-tuning on both **code summarization** and **commit-diff explanation** proved effective  
-- **Hyperparameter tuning** on CodeSearchNet transferred successfully to CommitPackFT  
-- **Cocktail training** consistently outperformed baselines  
-- **Generalization improved**: performance gains extended across datasets  
+- Multi-task fine-tuning on both code summarization and commit-diff explanation proved effective  
+- Hyperparameter tuning on CodeSearchNet transferred successfully to CommitPackFT  
+- Cocktail training consistently outperformed baselines  
+- Generalization improved: performance gains extended across datasets  
 
 ---
 
 ## Future Work  
 
-- Test different **cocktail ratios** (e.g., 40/60, 70/30)  
-- Extend to **more programming languages** beyond Python  
-- Enable **cross-language transfer learning**  
-- Handle **multi-function snippets** and **repository-level tasks** for large-scale projects  
-- Add predictive tasks (e.g., **estimating delivery timelines** from commit activity)  
+- Test different cocktail ratios (e.g., 40/60, 70/30)  
+- Extend to more programming languages beyond Python  
+- Enable cross-language transfer learning* 
+- Handle multi-function snippets and repository-level tasks for large-scale projects  
+- Add predictive tasks (e.g., estimating delivery timelines from commit activity)  
 
 ---
 
