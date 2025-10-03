@@ -185,7 +185,7 @@ This approach led to a clear reduction in test loss on the combined dataset as w
   <tr>
     <td align="center" width="60%">
       <img src="https://github.com/user-attachments/assets/c60b7bfb-5f55-4b44-8f87-2b8debdfbae7" alt="Figure 7" width="100%"/>
-      <p><em>Figure 8 – Cocktail fine-tuning improved CE across the combined dataset</em></p>
+      <p><em>Figure 10 – Cocktail fine-tuning improved CE across the combined dataset</em></p>
     </td>
     <td align="center" width="40%">
       
